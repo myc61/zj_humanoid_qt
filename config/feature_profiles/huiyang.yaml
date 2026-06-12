@@ -1,0 +1,41 @@
+# 功能配置名称，会显示在主窗口标题和“功能配置”查看窗口中
+profile_name: 惠阳版
+
+# features 下每个布尔值控制一个具体功能
+# true 表示启用，false 表示关闭
+features:
+  # 保留连接、状态监控、功能栏、关节监控等基础页
+  connection_tab: true
+  status_monitor_tab: true
+  function_tab: true
+  joint_monitor_tab: true
+
+  # 功能栏中仅保留这两个动作
+  small_brain_upload_file: false
+  small_brain_download_file: false
+  small_brain_upload_folder: false
+  small_brain_download_folder: false
+  small_brain_restart_embedded: true
+  small_brain_restart_middleware: true
+  small_brain_pull_middleware_log: false
+  small_brain_pull_embedded_logs: false
+  middleware_upgrade: false
+  remote_file_read: false
+  remote_file_write: false
+
+  # 去掉其他页签
+  joint_control_tab: false
+  navigation_tab: false
+  container_operations_tab: false
+  humanode_demo_tab: false
+  factory_test_tab: false
+  pose_estimation_tab: false
+  maintenance_tab: false
+  command_tab: false
+  help_tab: false
+
+  # 保留惠阳相关页签
+  huiyang_tab: true
+  servoj_tool_tab: true
+  vision_monitor_tab: true
+  log_audit_tab: true

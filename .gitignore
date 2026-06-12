@@ -1,0 +1,25 @@
+# Build artifacts
+build/
+dist/
+
+# Runtime logs and captures
+logs/
+
+# Packaging tool downloads (e.g., appimagetool-*.AppImage)
+tools/
+
+# Local packaging virtual environment
+.pack-venv/
+.venv/
+
+# Local runtime state (UI persistence)
+.runtime/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Local Humanode demo workspace
+Humanode_Naviai-main/

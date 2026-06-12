@@ -1,0 +1,7 @@
+PyQt6>=6.5
+roslibpy>=1.6
+paramiko>=2.11
+requests>=2.28
+PyYAML>=6.0
+matplotlib>=3.8
+reportlab>=4.0

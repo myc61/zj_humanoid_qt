@@ -1,0 +1,40 @@
+# 功能配置名称，会显示在主窗口标题和“功能配置”查看窗口中
+profile_name: 内部版
+
+# features 下每个布尔值控制一个具体功能
+# true 表示启用，false 表示关闭
+features:
+  # 是否允许小脑上传单个文件
+  small_brain_upload_file: true
+  # 是否允许小脑下载单个文件
+  small_brain_download_file: true
+  # 是否允许小脑上传整个文件夹
+  small_brain_upload_folder: true
+  # 是否允许小脑下载整个文件夹
+  small_brain_download_folder: true
+  # 是否允许点击“小脑重启嵌入式”
+  small_brain_restart_embedded: true
+  # 是否允许点击“小脑重启中间件”
+  small_brain_restart_middleware: true
+  # 是否允许拉取小脑运控日志
+  small_brain_pull_middleware_log: true
+  # 是否允许拉取小脑嵌入式日志
+  small_brain_pull_embedded_logs: true
+  # 是否允许浏览和部署中间件升级包
+  middleware_upgrade: true
+  # 是否允许浏览、打开、重新加载远程文件
+  remote_file_read: true
+  # 是否允许保存、撤销、注释修改远程文件
+  remote_file_write: true
+  # 是否显示“关节控制”页签
+  joint_control_tab: true
+  # 是否显示“导航”页签
+  navigation_tab: false
+  # 是否显示“容器操作”页签
+  container_operations_tab: true
+  # 是否显示“测试Demo”页签
+  humanode_demo_tab: true
+  # 是否显示“视觉监控”页签
+  vision_monitor_tab: true
+  # 是否显示“位姿估计”页签
+  pose_estimation_tab: false

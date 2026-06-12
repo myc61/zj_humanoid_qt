@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Humanoid Robot Delivery Toolchain
+Comment=Humanoid robot delivery operations tool
+Exec=humanoid-robot-delivery-toolchain
+Icon=humanoid-robot-delivery-toolchain
+Terminal=false
+Categories=Utility;Robotics;
+StartupNotify=true
