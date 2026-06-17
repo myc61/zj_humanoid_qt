@@ -2032,7 +2032,7 @@ class MainWindow(QWidget):
         model_up = str(model).upper()
         if model_up == "WA1":
             new_model = "WA1"
-        elif model_up == "I2":
+        elif model_up.startswith("I"):
             new_model = "I2"
         elif model_up == "WA2_LS":
             new_model = "WA2_LS"
@@ -2082,6 +2082,8 @@ class MainWindow(QWidget):
 
         if hasattr(self, "humanode_demo_case_layout"):
             self.refresh_humanode_demo_case_buttons()
+        if hasattr(self, "factory_camera_head_required"):
+            self._factory_refresh_camera_labels()
         if hasattr(self, "factory_camera_head_topic_value"):
             self._factory_update_camera_topics_display()
         if hasattr(self, "huiyang_model_combo"):
@@ -3450,14 +3452,18 @@ class MainWindow(QWidget):
         row_step6.addStretch(1)
 
         row_step6_topics = QGridLayout()
-        row_step6_topics.addWidget(QLabel("头部话题"), 0, 0)
+        self.factory_camera_head_topic_label = QLabel("头部话题")
+        row_step6_topics.addWidget(self.factory_camera_head_topic_label, 0, 0)
         row_step6_topics.addWidget(self.factory_camera_head_topic_value, 0, 1)
-        row_step6_topics.addWidget(QLabel("胸部话题"), 1, 0)
+        self.factory_camera_chest_topic_label = QLabel("胸部话题")
+        row_step6_topics.addWidget(self.factory_camera_chest_topic_label, 1, 0)
         row_step6_topics.addWidget(self.factory_camera_chest_topic_value, 1, 1)
 
         row_step6_preview = QGridLayout()
-        row_step6_preview.addWidget(QLabel("头部图像"), 0, 0)
-        row_step6_preview.addWidget(QLabel("胸部图像"), 0, 1)
+        self.factory_camera_head_preview_title = QLabel("头部图像")
+        self.factory_camera_chest_preview_title = QLabel("胸部图像")
+        row_step6_preview.addWidget(self.factory_camera_head_preview_title, 0, 0)
+        row_step6_preview.addWidget(self.factory_camera_chest_preview_title, 0, 1)
         row_step6_preview.addWidget(self.factory_camera_head_preview, 1, 0)
         row_step6_preview.addWidget(self.factory_camera_chest_preview, 1, 1)
         row_step6_preview.addWidget(self.factory_camera_head_path, 2, 0)
@@ -4742,10 +4748,51 @@ class MainWindow(QWidget):
     def _append_log(self, text: str):
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         clean = ANSI_ESCAPE_RE.sub("", str(text or ""))
+        if len(clean) > 4000:
+            clean = f"{clean[:4000]} ... [truncated, total={len(str(text or ''))} chars]"
         raw = f"[{ts}] {clean}"
         color = self._log_text_color(raw)
         escaped = html.escape(raw).replace("\n", "<br>")
         self.output.append(f'<span style="color: {color};">{escaped}</span>')
+
+    def _summarize_movej_path_request(self, req: dict) -> str:
+        try:
+            if not isinstance(req, dict):
+                return str(req)
+            path = list(req.get("path") or [])
+            points = len(path)
+            first_joint = []
+            last_joint = []
+            if points > 0 and isinstance(path[0], dict):
+                first_joint = list(path[0].get("joint") or [])
+            if points > 1 and isinstance(path[-1], dict):
+                last_joint = list(path[-1].get("joint") or [])
+            dims = len(first_joint) if first_joint else (len(last_joint) if last_joint else 0)
+            preview_len = 4
+
+            def _fmt(vals: list) -> list:
+                out = []
+                for v in vals[:preview_len]:
+                    try:
+                        out.append(round(float(v), 4))
+                    except Exception:
+                        out.append(v)
+                return out
+
+            summary = {
+                "arm_type": req.get("arm_type"),
+                "is_async": req.get("is_async"),
+                "time": req.get("time"),
+                "path_points": points,
+                "joint_dims": dims,
+                "first_joint_preview": _fmt(first_joint),
+            }
+            if points > 1:
+                summary["last_joint_preview"] = _fmt(last_joint)
+            return json.dumps(summary, ensure_ascii=False)
+        except Exception:
+            text = json.dumps(req, ensure_ascii=False) if isinstance(req, dict) else str(req)
+            return text if len(text) <= 800 else (text[:800] + " ...")
 
     def _append_humanode_demo_output(self, text: str):
         clean = ANSI_ESCAPE_RE.sub("", str(text or "")).replace("\r", "")
@@ -4847,13 +4894,45 @@ class MainWindow(QWidget):
             return ""
         if text.startswith("WA1"):
             return "WA1"
-        if text.startswith("I2"):
+        if text.startswith("I"):
             return "I2"
         if text.startswith("WA2_LS"):
             return "WA2_LS"
         if text.startswith("WA2"):
             return "WA2"
         return ""
+
+    def _is_i_series_model(self, model: str | None = None) -> bool:
+        text = str(model or getattr(self, "robot_model", "") or "").strip().upper()
+        return bool(text) and text.startswith("I")
+
+    def _factory_model_has_lowerlimb(self, model: str | None = None) -> bool:
+        return self._is_i_series_model(model or self._factory_current_model())
+
+    def _factory_camera_slot_labels(self, model: str | None = None) -> dict:
+        if self._is_i_series_model(model or self._factory_current_model()):
+            return {"head": "头部相机", "chest": "腹部相机"}
+        return {"head": "头部相机", "chest": "胸部相机"}
+
+    def _factory_refresh_camera_labels(self):
+        labels = self._factory_camera_slot_labels()
+        chest_text = labels["chest"]
+        if hasattr(self, "factory_camera_head_required"):
+            self.factory_camera_head_required.setText(f"{labels['head']}必须检测")
+        if hasattr(self, "factory_camera_chest_required"):
+            self.factory_camera_chest_required.setText(f"{chest_text}必须检测")
+        if hasattr(self, "factory_camera_head_topic_label"):
+            self.factory_camera_head_topic_label.setText(f"{labels['head']}话题")
+        if hasattr(self, "factory_camera_chest_topic_label"):
+            self.factory_camera_chest_topic_label.setText(f"{chest_text}话题")
+        if hasattr(self, "factory_camera_head_preview_title"):
+            self.factory_camera_head_preview_title.setText(labels["head"])
+        if hasattr(self, "factory_camera_chest_preview_title"):
+            self.factory_camera_chest_preview_title.setText(chest_text)
+        if hasattr(self, "factory_camera_head_preview") and self.factory_camera_head_preview.pixmap() is None:
+            self.factory_camera_head_preview.setText(f"{labels['head']}等待画面")
+        if hasattr(self, "factory_camera_chest_preview") and self.factory_camera_chest_preview.pixmap() is None:
+            self.factory_camera_chest_preview.setText(f"{chest_text}等待画面")
 
     def _set_robot_basic_info(self, data: dict):
         robot_version = str(data.get("robot_version") or "-")
@@ -4873,6 +4952,8 @@ class MainWindow(QWidget):
             self.lowerlimb_version_value.setText(str(data.get("lowerlimb_version") or "-"))
         if hasattr(self, "factory_info_model_value"):
             self._factory_refresh_info_snapshot_fields()
+        if hasattr(self, "factory_camera_head_required"):
+            self._factory_refresh_camera_labels()
 
     def _set_robot_system_info(self, data: dict):
         if not hasattr(self, "system_info_text"):
@@ -6186,7 +6267,21 @@ class MainWindow(QWidget):
         }
         return labels.get(int(step), f"步骤{step}")
 
+    def _factory_normalize_flow_state(self) -> dict:
+        # 固定步骤状态顺序，避免报告输出受“完成按钮点击顺序”影响。
+        normalized = {}
+        for step in self._factory_flow_steps:
+            raw = self._factory_flow_state.get(step, {}) if isinstance(self._factory_flow_state, dict) else {}
+            normalized[int(step)] = {
+                "done": bool(raw.get("done")),
+                "time": str(raw.get("time") or ""),
+                "note": str(raw.get("note") or ""),
+            }
+        self._factory_flow_state = normalized
+        return normalized
+
     def _factory_update_flow_status(self):
+        self._factory_normalize_flow_state()
         done = 0
         total = len(self._factory_flow_steps)
         for step in self._factory_flow_steps:
@@ -6273,18 +6368,29 @@ class MainWindow(QWidget):
             "head": "/zj_humanoid/sensor/realsense_head/color/image_raw",
             "chest": "/zj_humanoid/sensor/realsense_up/color/image_raw",
         }
-        if model_name != "WA1":
+        if self._is_i_series_model(model_name):
+            topics["head"] = ""
+            topics["chest"] = "/zj_humanoid/sensor/realsense_down/color/image_raw"
+        elif model_name != "WA1":
             topics["chest"] = ""
         return topics
 
     def _factory_update_camera_topics_display(self):
         topics = self._factory_camera_topics_for_model()
         requirement = self._factory_camera_requirement_state()
+        labels = self._factory_camera_slot_labels()
+        if hasattr(self, "factory_camera_head_required"):
+            self._factory_refresh_camera_labels()
         if hasattr(self, "factory_camera_head_topic_value"):
-            head_topic = topics.get("head") or "-"
+            head_topic = topics.get("head") or (f"N/A({labels['head']}不可用)" if self._is_i_series_model() else "-")
             self.factory_camera_head_topic_value.setText(head_topic if requirement.get("head_required") else f"{head_topic} (未启用)")
         if hasattr(self, "factory_camera_chest_topic_value"):
-            chest_topic = topics.get("chest") or "N/A(非WA1机型无胸部相机)"
+            if topics.get("chest"):
+                chest_topic = topics.get("chest")
+            elif self._is_i_series_model():
+                chest_topic = "N/A(I系列无第二路上身相机)"
+            else:
+                chest_topic = f"N/A(非WA1机型无{labels['chest']})"
             if topics.get("chest") and not requirement.get("chest_required"):
                 chest_topic = f"{topics.get('chest')} (未启用)"
             self.factory_camera_chest_topic_value.setText(chest_topic)
@@ -6345,7 +6451,8 @@ class MainWindow(QWidget):
                                 self._factory_camera_last_frame_ts[cam_key] = time.time()
                                 self.factory_camera_image_signal.emit(cam_key, img, path)
                                 if first_hit:
-                                    self._emit_factory_test(f"[OK] 步骤8收到{cam_key}相机画面: {cam_topic}")
+                                    slot_label = self._factory_camera_slot_labels().get(cam_key, cam_key)
+                                    self._emit_factory_test(f"[OK] 步骤8收到{slot_label}画面: {cam_topic}")
                             except Exception as e:
                                 self._emit_factory_test(f"[ERR] 步骤8图像解析失败({cam_key}): {e}")
                         return _cb
@@ -6387,9 +6494,11 @@ class MainWindow(QWidget):
 
     def _factory_reset_camera_requirement_defaults(self):
         if hasattr(self, "factory_camera_head_required"):
-            self.factory_camera_head_required.setChecked(True)
+            self.factory_camera_head_required.setChecked(not self._is_i_series_model())
         if hasattr(self, "factory_camera_chest_required"):
-            self.factory_camera_chest_required.setChecked(self._factory_current_model() == "WA1")
+            self.factory_camera_chest_required.setChecked(self._factory_current_model() == "WA1" or self._is_i_series_model())
+        if hasattr(self, "factory_camera_head_required"):
+            self._factory_refresh_camera_labels()
 
     def _factory_info_snapshot(self) -> dict:
         def _line_edit_text(attr_name: str) -> str:
@@ -6399,7 +6508,7 @@ class MainWindow(QWidget):
         system_widget = getattr(self, "system_info_text", None)
         system_text = system_widget.toPlainText().strip() if system_widget else "-"
         lowerlimb_widget = getattr(self, "lowerlimb_version_value", None)
-        show_lowerlimb = bool(lowerlimb_widget and lowerlimb_widget.isVisible())
+        show_lowerlimb = bool((lowerlimb_widget and lowerlimb_widget.isVisible()) or self._factory_model_has_lowerlimb())
         return {
             "robot_model": _line_edit_text("robot_version_value"),
             "embedded_version": _line_edit_text("hardware_version_value"),
@@ -6705,10 +6814,10 @@ class MainWindow(QWidget):
             self.factory_topic_service_audit_text.clear()
         if hasattr(self, "factory_camera_head_preview"):
             self.factory_camera_head_preview.setPixmap(QPixmap())
-            self.factory_camera_head_preview.setText("头部相机等待画面")
+            self.factory_camera_head_preview.setText(f"{self._factory_camera_slot_labels()['head']}等待画面")
         if hasattr(self, "factory_camera_chest_preview"):
             self.factory_camera_chest_preview.setPixmap(QPixmap())
-            self.factory_camera_chest_preview.setText("胸部相机等待画面")
+            self.factory_camera_chest_preview.setText(f"{self._factory_camera_slot_labels()['chest']}等待画面")
         if hasattr(self, "factory_camera_head_path"):
             self.factory_camera_head_path.setText("-")
         if hasattr(self, "factory_camera_chest_path"):
@@ -6721,13 +6830,15 @@ class MainWindow(QWidget):
         self._emit_factory_test("[INFO] 工厂测试流程已重置")
 
     def factory_mark_step_done(self, step: int, note: str = ""):
+        self._factory_normalize_flow_state()
         step_i = int(step)
         if step_i not in self._factory_flow_steps:
             return
-        item = self._factory_flow_state.setdefault(step_i, {"done": False, "time": "", "note": ""})
+        item = self._factory_flow_state.get(step_i, {"done": False, "time": "", "note": ""})
         item["done"] = True
         item["time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         item["note"] = str(note or "").strip()
+        self._factory_flow_state[step_i] = item
         self._factory_update_flow_status()
         self._emit_factory_test(f"[OK] 步骤{step_i}完成: {self._factory_step_label(step_i)}")
 
@@ -7225,21 +7336,24 @@ class MainWindow(QWidget):
 
     def _factory_current_model(self) -> str:
         model = str(getattr(self, "robot_model", "") or "").strip().upper()
-        if model in {"WA1", "WA2", "I2"}:
+        if model in {"WA1", "WA2", "I2", "WA2_LS"}:
             return model
+        if model.startswith("I"):
+            return "I2"
         return "WA2"
 
     def factory_step5_finish(self):
         model = self._factory_current_model()
         requirement = self._factory_camera_requirement_state()
+        labels = self._factory_camera_slot_labels(model)
         head_ok = bool(self._factory_camera_last_image_path.get("head"))
         chest_ok = bool(self._factory_camera_last_image_path.get("chest"))
 
         if requirement["head_required"] and not head_ok:
-            self._emit_factory_test("[ERR] 步骤8未完成：未收到头部相机图像")
+            self._emit_factory_test(f"[ERR] 步骤8未完成：未收到{labels['head']}图像")
             return
         if requirement["chest_required"] and not chest_ok:
-            self._emit_factory_test("[ERR] 步骤8未完成：未收到胸部相机图像")
+            self._emit_factory_test(f"[ERR] 步骤8未完成：未收到{labels['chest']}图像")
             return
 
         note = (
@@ -7253,11 +7367,12 @@ class MainWindow(QWidget):
 
     def factory_generate_report(self):
         now = datetime.now()
+        flow_state = self._factory_normalize_flow_state()
         factory_info = self._factory_info_snapshot()
         model = str(factory_info.get("robot_model") or "").strip() or self._factory_current_model()
         robot_sn = self.factory_robot_sn_edit.text().strip() if hasattr(self, "factory_robot_sn_edit") else ""
         camera_requirement = self._factory_camera_requirement_state()
-        all_done = all(bool(self._factory_flow_state.get(s, {}).get("done")) for s in self._factory_flow_steps)
+        all_done = all(bool(flow_state.get(s, {}).get("done")) for s in self._factory_flow_steps)
         result = "PASS" if all_done else "INCOMPLETE"
 
         lines = []
@@ -7269,7 +7384,7 @@ class MainWindow(QWidget):
         lines.append("")
         lines.append("[步骤结果]")
         for step in self._factory_flow_steps:
-            item = self._factory_flow_state.get(step, {})
+            item = flow_state.get(step, {})
             done = bool(item.get("done"))
             done_txt = "已检测" if done else "未检测"
             t = item.get("time") or "-"
@@ -7358,7 +7473,7 @@ class MainWindow(QWidget):
                 "robot_model": model,
                 "robot_sn": robot_sn,
                 "overall_result": result,
-                "steps": self._factory_flow_state,
+                "steps": flow_state,
                 "factory_info": dict(factory_info),
                 "ros_audit": dict(audit),
                 "pressure_max": self._factory_pressure_max,
@@ -7480,13 +7595,26 @@ class MainWindow(QWidget):
                 *([_pdf_para(f"下肢版本: {factory_info['lowerlimb_version']}", font_name, 10)] if factory_info.get("show_lowerlimb") else []),
                 _pdf_para(f"系统信息:\n{factory_info['system_info']}", font_name, 10),
                 Spacer(1, 8),
-                Paragraph("步骤3 ROS话题检测", header_style),
-                _pdf_para(f"话题数: {int(audit.get('topic_count') or 0)}", font_name, 10),
-                Spacer(1, 8),
                 Paragraph("步骤结果", header_style),
             ]
 
             topic_rows = list(audit.get("topics") or [])
+            step_table_rows = [["步骤", "名称", "结果", "时间"]]
+            for step in self._factory_flow_steps:
+                item = flow_state.get(step, {})
+                done = bool(item.get("done"))
+                step_table_rows.append([
+                    _pdf_para(str(step), font_name, 9, 12),
+                    _pdf_para(self._factory_step_label(step), font_name, 9, 12),
+                    _pdf_para("已检测" if done else "未检测", font_name, 9, 12),
+                    _pdf_para(str(item.get("time") or "-"), font_name, 9, 12),
+                ])
+            story.append(_pdf_table(step_table_rows, font_name, [36, 170, 80, 180]))
+            story.append(Spacer(1, 8))
+
+            story.append(Paragraph("步骤3 ROS话题检测", header_style))
+            story.append(_pdf_para(f"话题数: {int(audit.get('topic_count') or 0)}", font_name, 10))
+            story.append(Spacer(1, 8))
             if topic_rows:
                 ros_topic_rows = [["话题", "频率"]]
                 for item in topic_rows:
@@ -7497,19 +7625,6 @@ class MainWindow(QWidget):
                 story.append(Paragraph("步骤3 话题频率明细", header_style))
                 story.append(_pdf_table(ros_topic_rows, font_name, [320, 160]))
                 story.append(Spacer(1, 8))
-
-            step_table_rows = [["步骤", "名称", "结果", "时间"]]
-            for step in self._factory_flow_steps:
-                item = self._factory_flow_state.get(step, {})
-                done = bool(item.get("done"))
-                step_table_rows.append([
-                    _pdf_para(str(step), font_name, 9, 12),
-                    _pdf_para(self._factory_step_label(step), font_name, 9, 12),
-                    _pdf_para("已检测" if done else "未检测", font_name, 9, 12),
-                    _pdf_para(str(item.get("time") or "-"), font_name, 9, 12),
-                ])
-            story.append(_pdf_table(step_table_rows, font_name, [36, 170, 80, 180]))
-            story.append(Spacer(1, 8))
 
             pressure_rows = [["手指", "左手最大值", "右手最大值"]]
             pressure_names = self._finger_labels_for_side()
@@ -7562,7 +7677,7 @@ class MainWindow(QWidget):
                 json.dump(report_data, f, ensure_ascii=False, indent=2)
 
             def _step_row_html(step: int) -> str:
-                item = self._factory_flow_state.get(step, {})
+                item = flow_state.get(step, {})
                 done = bool(item.get("done"))
                 status = "已检测" if done else "未检测"
                 t = html.escape(str(item.get("time") or "-"))
@@ -7651,6 +7766,10 @@ class MainWindow(QWidget):
                 f"<p><b>上肢版本:</b> {html.escape(factory_info['upperlimb_version'])}</p>"
                 + (f"<p><b>下肢版本:</b> {html.escape(factory_info['lowerlimb_version'])}</p>" if factory_info.get("show_lowerlimb") else "")
                 + f"<div class='mono'>{html.escape(factory_info['system_info'])}</div>"
+                + "<h2>步骤结果</h2>"
+                "<table><thead><tr><th>步骤</th><th>名称</th><th>结果</th><th>时间</th></tr></thead><tbody>"
+                + "".join([_step_row_html(step) for step in self._factory_flow_steps])
+                + "</tbody></table>"
                 + "<h2>步骤3 ROS话题检测</h2>"
                 + f"<p><b>话题数:</b> {int(audit.get('topic_count') or 0)}</p>"
                 + (
@@ -7660,25 +7779,21 @@ class MainWindow(QWidget):
                     + "</tbody></table>"
                     if ros_topic_rows_html else ""
                 )
-                + "<h2>步骤结果</h2>"
-                "<table><thead><tr><th>步骤</th><th>名称</th><th>结果</th><th>时间</th></tr></thead><tbody>"
-                + "".join([_step_row_html(step) for step in self._factory_flow_steps])
-                + "</tbody></table>"
-                "<h2>步骤5 手指压力最大值</h2>"
-                "<table><thead><tr><th>手指</th><th>左手</th><th>右手</th></tr></thead><tbody>"
+                + "<h2>步骤5 手指压力最大值</h2>"
+                + "<table><thead><tr><th>手指</th><th>左手</th><th>右手</th></tr></thead><tbody>"
                 + "".join(pressure_rows)
                 + "</tbody></table>"
-                "<h2>步骤6 六维力</h2>"
+                + "<h2>步骤6 六维力</h2>"
                 f"<p><b>初始值:</b> {html.escape(self._factory_force_text_by_key('baseline'))}</p>"
                 f"<p><b>检测值:</b> {html.escape(self._factory_force_text_by_key('current'))}</p>"
                 f"<p><b>偏差:</b> {html.escape(self._factory_force_text_by_key('delta'))}</p>"
                 f"<p><b>历史最大偏差:</b> {html.escape(self._factory_force_delta_max_text())}</p>"
-                "<h2>步骤8 相机输出</h2>"
+                + "<h2>步骤8 相机输出</h2>"
                 f"<p><b>头部必须检测:</b> {'是' if camera_requirement['head_required'] else '否'}</p>"
                 f"<p><b>胸部必须检测:</b> {'是' if camera_requirement['chest_required'] else '否'}</p>"
                 f"{_html_image_block('头部相机图片', head_report_image)}"
                 f"{_html_image_block('胸部相机图片', chest_report_image)}"
-                "<h2>附件</h2>"
+                + "<h2>附件</h2>"
                 f"{attachment_html}"
                 "</body></html>"
             )
@@ -13136,6 +13251,19 @@ class MainWindow(QWidget):
                         return False
                     return True
 
+                def _pose_reached(target_map: dict, actual_map: dict, tol: float = 0.08) -> bool:
+                    if not target_map or not actual_map:
+                        return False
+                    for joint_name, target in target_map.items():
+                        if joint_name not in actual_map:
+                            return False
+                        try:
+                            if abs(float(actual_map[joint_name]) - float(target)) > float(tol):
+                                return False
+                        except Exception:
+                            return False
+                    return True
+
                 for loop_idx in range(1, loop_count + 1):
                     if self._motion_exec_stop_event.is_set():
                         self.log_signal.emit(f"[INFO] 动作序列已打断: {seq_name}，在第{loop_idx}轮开始前停止")
@@ -13152,6 +13280,8 @@ class MainWindow(QWidget):
                         poses = g["poses"]
                         durations = g["durations"]
                         total_time = float(sum(durations)) if durations else 1.0
+                        service_timeout = max(60.0, total_time + 10.0)
+                        desired_last = self._desired_map_for_group(arm_type, poses, durations, total_time)
                         req_candidates = _req_candidates(arm_type, poses, durations)
                         group_service = self._movej_service_for_arm_type(arm_type) if use_auto_service else service_name
                         if not group_service:
@@ -13178,7 +13308,7 @@ class MainWindow(QWidget):
                         )
                         for ri, req in enumerate(req_candidates, start=1):
                             self.log_signal.emit(
-                                f"[REQ] 第{loop_idx}轮 分组{gi} 请求体#{ri}: {json.dumps(req, ensure_ascii=False)}"
+                                f"[REQ] 第{loop_idx}轮 分组{gi} 请求体#{ri}: {self._summarize_movej_path_request(req)}"
                             )
 
                         done = False
@@ -13190,8 +13320,10 @@ class MainWindow(QWidget):
                                     raise RuntimeError("ROSBridge 未连接")
                                 for ri, req in enumerate(req_candidates, start=1):
                                     try:
-                                        self.log_signal.emit(f"[REQ] 第{loop_idx}轮 分组{gi} ROSBridge调用#{ri}: {group_service}")
-                                        resp = self.ros.request_service(group_service, req)
+                                        self.log_signal.emit(
+                                            f"[REQ] 第{loop_idx}轮 分组{gi} ROSBridge调用#{ri}: {group_service}, timeout={service_timeout:.1f}s"
+                                        )
+                                        resp = self.ros.request_service(group_service, req, timeout=service_timeout)
                                         if not _resp_success(resp):
                                             last_err = RuntimeError(f"服务返回 success=false: {json.dumps(resp, ensure_ascii=False)}")
                                             continue
@@ -13200,6 +13332,23 @@ class MainWindow(QWidget):
                                         )
                                         done = True
                                         break
+                                    except TimeoutError:
+                                        verify_deadline = time.monotonic() + 3.0
+                                        reached = False
+                                        while time.monotonic() < verify_deadline:
+                                            if _pose_reached(desired_last, self._get_latest_joint_state_map()):
+                                                reached = True
+                                                break
+                                            time.sleep(0.2)
+                                        if reached:
+                                            self.log_signal.emit(
+                                                f"[WARN] 第{loop_idx}轮 分组{gi} ROSBridge响应超时，但关节已到位，按成功处理"
+                                            )
+                                            done = True
+                                            break
+                                        last_err = TimeoutError(
+                                            f"Service call timeout: {group_service} (timeout={service_timeout:.1f}s)"
+                                        )
                                     except Exception as e:
                                         last_err = e
 
@@ -13230,7 +13379,6 @@ class MainWindow(QWidget):
                                 sampler.join(timeout=1.0)
                             except Exception:
                                 pass
-                            desired_last = self._desired_map_for_group(arm_type, poses, durations, total_time)
                             self._append_joint_control_trace_sample(
                                 "seq",
                                 time.monotonic() - seq_trace_start,
@@ -13878,7 +14026,7 @@ class MainWindow(QWidget):
                     if emit_lines:
                         _emit_line(f"[小脑 上肢] {version_data['upperlimb_version']}")
 
-                    if str(robot_type).upper().startswith("I"):
+                    if self._factory_model_has_lowerlimb(robot_type or self._factory_current_model()):
                         out, err = self._run_sudo_bash(self.ssh, self.ssh_pwd.text(), "apt list 2>/dev/null | grep legged || true")
                         lower_raw = (out.strip() or err.strip() or "未匹配到 legged 包")
                         version_data["show_lowerlimb"] = True
