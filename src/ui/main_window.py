@@ -1470,14 +1470,19 @@ class MainWindow(QWidget):
         if not hasattr(self, "joint_ctrl_part"):
             return
         current = self.joint_ctrl_part.currentData()
+        model = str(getattr(self, "robot_model", "WA2")).upper()
+        # 示教模式全身统一用 15；WA1 的升降保持独立 arm_type=16
+        full_body_type = 15
         self.joint_ctrl_part.blockSignals(True)
         self.joint_ctrl_part.clear()
         self.joint_ctrl_part.addItem("左臂", 1)
         self.joint_ctrl_part.addItem("右臂", 2)
+        self.joint_ctrl_part.addItem("双臂", 3)
         self.joint_ctrl_part.addItem("脖子", 4)
         self.joint_ctrl_part.addItem("腰部", 8)
-        if str(getattr(self, "robot_model", "WA2")).upper() == "WA1":
+        if model == "WA1":
             self.joint_ctrl_part.addItem("升降", 16)
+        self.joint_ctrl_part.addItem("全身", full_body_type)
         self.joint_ctrl_part.blockSignals(False)
         if current is not None:
             idx = self.joint_ctrl_part.findData(current)
@@ -11573,7 +11578,17 @@ class MainWindow(QWidget):
             return int(data)
         except Exception:
             text = self.joint_ctrl_part.currentText().strip()
-            mapping = {"左臂": 1, "右臂": 2, "脖子": 4, "腰部": 8, "升降": 16}
+            # 示教模式全身统一映射到 15，升降仍通过 16 单独控制
+            full_body_type = 15
+            mapping = {
+                "左臂": 1,
+                "右臂": 2,
+                "双臂": 3,
+                "脖子": 4,
+                "腰部": 8,
+                "升降": 16,
+                "全身": full_body_type,
+            }
             return mapping.get(text, 1)
 
     def _teach_service_candidates(self, action: str):
@@ -17375,27 +17390,39 @@ class MainWindow(QWidget):
     def _go_home_for_part(self, arm_type: int, part: str, emit_line, transport_mode: str | None = None):
         service_name = self._home_service_for_part(arm_type)
         transport = str(transport_mode or getattr(self, "_joint_ctrl_transport_mode", "ros") or "ros").strip().lower()
+        is_full_body = int(arm_type) in (15, 31)
+        if is_full_body:
+            home_targets = [
+                ("双臂", "/zj_humanoid/upperlimb/go_down/dual_arm"),
+                ("脖子", "/zj_humanoid/upperlimb/go_home/neck"),
+                ("腰部", "/zj_humanoid/upperlimb/go_home/waist"),
+            ]
+        else:
+            home_targets = [(part, service_name)]
 
         def worker():
             try:
-                emit_line(f"[REQ] 归位({transport}): part={part}, service={service_name}")
+                emit_line(f"[REQ] 归位({transport}): part={part}")
                 if transport == "ros":
                     if not (self.ros and self.ros.check_connection()):
                         raise RuntimeError("ROSBridge 未连接")
-                    resp = self.ros.request_service(service_name, {})
-                    emit_line(f"[OK] 归位成功: {part} [{service_name}] -> {json.dumps(resp, ensure_ascii=False)}")
+                    for target_part, target_service in home_targets:
+                        emit_line(f"[REQ] 归位({transport}): part={target_part}, service={target_service}")
+                        resp = self.ros.request_service(target_service, {})
+                        emit_line(f"[OK] 归位成功: {target_part} [{target_service}] -> {json.dumps(resp, ensure_ascii=False)}")
                     return
 
                 if not (self.ssh and self.ssh.ssh and self.ssh.sftp):
                     raise RuntimeError("SSH(小脑) 未连接")
                 emit_line("[INFO] 使用 SSH(小脑) 归位")
-                cmd = f"rosservice call {service_name} '{{}}'"
-                emit_line(f"[REQ] {cmd}")
-                out, err = self._run_ros_cli_via_ssh_interactive(cmd)
-                text = ((out or "") + "\n" + (err or "")).strip()
-                emit_line(f"[OK] 归位完成: {part} [{service_name}] -> {text or '调用完成'}")
+                for target_part, target_service in home_targets:
+                    cmd = f"rosservice call {target_service} '{{}}'"
+                    emit_line(f"[REQ] {cmd}")
+                    out, err = self._run_ros_cli_via_ssh_interactive(cmd)
+                    text = ((out or "") + "\n" + (err or "")).strip()
+                    emit_line(f"[OK] 归位完成: {target_part} [{target_service}] -> {text or '调用完成'}")
             except Exception as e:
-                emit_line(f"[ERR] 归位失败: {part} [{service_name}] -> {e}")
+                emit_line(f"[ERR] 归位失败: {part} -> {e}")
 
         self._run_async(worker)
 
