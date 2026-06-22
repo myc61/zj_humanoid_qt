@@ -205,6 +205,14 @@ ServoJ 工具用于：
 - Robot 快照检测
 - Sensor 检测
 
+UpperLimb 运维补充（WA1）：
+
+- 支持选择单关节做往复 ServoJ 测试，其他关节固定在测试启动时的基线值
+- 关节运动窗口来自 `config/joint_limits.yaml`，按限位两端各内缩 `0.2rad`
+- 默认测试时长 `600s`（10分钟），结束后自动调用 whole_body MoveJ 回到基线
+- 优先使用 ROSBridge 发布与服务调用；ROSBridge 不可用时自动降级为 SSH(小脑) 远端执行
+- 输出 PASS/FAIL 结果摘要，包含时长达标、峰值误差、回基线误差等关键指标
+
 ### 3.13 日志排查
 
 日志排查页当前支持三种模式：

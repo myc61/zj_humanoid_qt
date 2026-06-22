@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('check\\jetpack_check.sh', 'check'), ('config\\finger_joints.yaml', 'config'), ('config\\wa2_ls_joint_data.yaml', 'config')]
+datas = [('check\\jetpack_check.sh', 'check'), ('config\\finger_joints.yaml', 'config'), ('config\\joint_limits.yaml', 'config'), ('config\\wa2_ls_joint_data.yaml', 'config')]
 binaries = []
 hiddenimports = ['matplotlib.backends.backend_qtagg']
 tmp_ret = collect_all('PyQt6')

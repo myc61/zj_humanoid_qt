@@ -4,7 +4,6 @@ ROBOT_NAME: WA2
 
 JOINTS_LIST:
   - Chest_Z_L:
-      pos_limit: [-0.9984, 0.3438]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -15,7 +14,6 @@ JOINTS_LIST:
       f_b: 0.00
       f_c: 0.00
   - Shoulder_Y_L:
-      pos_limit: [-3.2638, 1.1694]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -26,7 +24,6 @@ JOINTS_LIST:
       f_b: 1.20
       f_c: 1.20
   - Shoulder_X_L:
-      pos_limit: [-0.3526, 2.7402]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -37,7 +34,6 @@ JOINTS_LIST:
       f_b: 1.83
       f_c: -0.52
   - Shoulder_Z_L:
-      pos_limit: [-2.8885, 2.8885]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -48,7 +44,6 @@ JOINTS_LIST:
       f_b: 1.70
       f_c: 0.02
   - Elbow_L:
-      pos_limit: [-2.0420, 0.0820]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -59,7 +54,6 @@ JOINTS_LIST:
       f_b: 0.59
       f_c: 0.78
   - Wrist_Z_L:
-      pos_limit: [-2.9147, 2.9147]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -70,7 +64,6 @@ JOINTS_LIST:
       f_b: 0.61
       f_c: 0.00
   - Wrist_Y_L:
-      pos_limit: [-1.5184, 1.2566]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 1
@@ -81,7 +74,6 @@ JOINTS_LIST:
       f_b: 0.06
       f_c: 0.10
   - Wrist_X_L:
-      pos_limit: [-1.5184, 1.5184]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 1
@@ -92,7 +84,6 @@ JOINTS_LIST:
       f_b: 0.37
       f_c: -0.19
   - Chest_Z_R:
-      pos_limit: [ -0.3438, 0.9948]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -103,7 +94,6 @@ JOINTS_LIST:
       f_b: 0.00
       f_c: 0.00
   - Shoulder_Y_R:
-      pos_limit: [-3.2638, 1.1694]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -114,7 +104,6 @@ JOINTS_LIST:
       f_b: 1.64
       f_c: 1.11
   - Shoulder_X_R:
-      pos_limit: [-2.7402, 0.3526]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -125,7 +114,6 @@ JOINTS_LIST:
       f_b: 1.00
       f_c: 1.14
   - Shoulder_Z_R:
-      pos_limit: [-2.8885, 2.8885]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -136,7 +124,6 @@ JOINTS_LIST:
       f_b: 1.49
       f_c: 0.00
   - Elbow_R:
-      pos_limit: [-2.0420, 0.0820]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -147,7 +134,6 @@ JOINTS_LIST:
       f_b: 0.69
       f_c: 0.79
   - Wrist_Z_R:
-      pos_limit: [-2.9147, 2.9147]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 0
@@ -158,7 +144,6 @@ JOINTS_LIST:
       f_b: 0.88
       f_c: 0.00
   - Wrist_Y_R:
-      pos_limit: [-1.5184, 1.2566]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 1
@@ -169,7 +154,6 @@ JOINTS_LIST:
       f_b: 0.38
       f_c: -0.11
   - Wrist_X_R:
-      pos_limit: [-1.5184, 1.5184]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 1
@@ -180,7 +164,6 @@ JOINTS_LIST:
       f_b: 0.62
       f_c: -0.06
   - Neck_Z:
-      pos_limit: [-0.7330, 0.7330]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 1
@@ -191,7 +174,6 @@ JOINTS_LIST:
       f_b: 0.00
       f_c: 0.00
   - Neck_Y:
-      pos_limit: [-0.1693, 0.3438]
       vel_limit: 5.0
       acc_limit: 100.0
       offset_vel: 1
@@ -202,7 +184,6 @@ JOINTS_LIST:
       f_b: 0.00
       f_c: 0.00    
   - Pitch_Y_B:
-      pos_limit: [-0.9948, 0.9948]
       vel_limit: 2.5
       acc_limit: 30.0
       offset_vel: 0
@@ -213,7 +194,6 @@ JOINTS_LIST:
       f_b: 0.00
       f_c: 0.00
   - Pitch_Y_M:
-      pos_limit: [-2.3911, 2.3911]
       vel_limit: 2.5
       acc_limit: 30.0
       offset_vel: 0
@@ -224,7 +204,6 @@ JOINTS_LIST:
       f_b: 0.00
       f_c: 0.00
   - Waist_Z:
-      pos_limit: [-2.0420, 3.1765]
       vel_limit: 2.5
       acc_limit: 30.0
       offset_vel: 0
@@ -235,7 +214,6 @@ JOINTS_LIST:
       f_b: 0.00
       f_c: 0.00 
   - Waist_Y:
-      pos_limit: [-0.9076, 0.9076]
       vel_limit: 2.5
       acc_limit: 30.0
       offset_vel: 0

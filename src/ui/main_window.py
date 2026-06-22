@@ -199,7 +199,7 @@ class MainWindow(QWidget):
         title = f"Humanoid Robot Delivery Toolchain {APP_DISPLAY_VERSION}"
         if self.instance_name:
             title = f"{title} [{self.instance_name}]"
-        if self.feature_profile_name and self.feature_profile_name != "内部版":
+        if self.feature_profile_name:
             title = f"{title} [{self.feature_profile_name}]"
         self.setWindowTitle(title)
         self.resize(1100, 720)
@@ -305,6 +305,11 @@ class MainWindow(QWidget):
         self._maintenance_pressure_active = False
         self._maintenance_pressure_ssh_session = None
         self._maintenance_finger_presets = self._load_maintenance_finger_presets()
+        self._maintenance_wa1_joint_limit_cache = None
+        self._maintenance_wa1_limit_margin = 0.05
+        self._maintenance_wa1_single_joint_running = False
+        self._maintenance_wa1_single_joint_stop_requested = False
+        self._maintenance_wa1_single_joint_remote_pid = ""
         self._storage_root_cache = None
         self.robot_model = "WA2"
         self._cmd_topics = []
@@ -2074,6 +2079,12 @@ class MainWindow(QWidget):
                 self.btn_maintenance_upperlimb_test.setText("上传YAML并执行上肢回放")
             else:
                 self.btn_maintenance_upperlimb_test.setText("执行上肢测试")
+        if hasattr(self, "maintenance_wa1_single_joint_box"):
+            self.maintenance_wa1_single_joint_box.setVisible(new_model == "WA1")
+        if hasattr(self, "maintenance_wa1_joint_combo"):
+            self._maintenance_refresh_wa1_joint_options()
+        if hasattr(self, "maintenance_wa1_status_label"):
+            self._maintenance_update_wa1_status_label()
 
         self.joint_names = self._get_joint_names_by_model(self.robot_model)
         self._rebuild_joint_grid()
@@ -4165,6 +4176,72 @@ class MainWindow(QWidget):
         upperlimb_layout.addWidget(QLabel("UpperLimb 功能"))
         upperlimb_layout.addLayout(upperlimb_row)
 
+        self.maintenance_wa1_joint_combo = QComboBox()
+        self.maintenance_wa1_joint_combo.currentIndexChanged.connect(self._maintenance_on_wa1_joint_changed)
+        self.maintenance_wa1_amp_spin = QDoubleSpinBox()
+        self.maintenance_wa1_amp_spin.setRange(0.0001, 0.2)
+        self.maintenance_wa1_amp_spin.setDecimals(4)
+        self.maintenance_wa1_amp_spin.setSingleStep(0.0001)
+        self.maintenance_wa1_amp_spin.setValue(0.0005)
+        self.maintenance_wa1_hz_spin = QDoubleSpinBox()
+        self.maintenance_wa1_hz_spin.setRange(10.0, 300.0)
+        self.maintenance_wa1_hz_spin.setDecimals(0)
+        self.maintenance_wa1_hz_spin.setSingleStep(10.0)
+        self.maintenance_wa1_hz_spin.setValue(200.0)
+        self.maintenance_wa1_duration_spin = QSpinBox()
+        self.maintenance_wa1_duration_spin.setRange(10, 3600)
+        self.maintenance_wa1_duration_spin.setValue(600)
+        self.maintenance_wa1_err_thresh_spin = QDoubleSpinBox()
+        self.maintenance_wa1_err_thresh_spin.setRange(0.01, 0.5)
+        self.maintenance_wa1_err_thresh_spin.setDecimals(2)
+        self.maintenance_wa1_err_thresh_spin.setSingleStep(0.01)
+        self.maintenance_wa1_err_thresh_spin.setValue(0.08)
+        self.maintenance_wa1_back_movej_v_spin = QDoubleSpinBox()
+        self.maintenance_wa1_back_movej_v_spin.setRange(0.01, 1.0)
+        self.maintenance_wa1_back_movej_v_spin.setDecimals(2)
+        self.maintenance_wa1_back_movej_v_spin.setSingleStep(0.05)
+        self.maintenance_wa1_back_movej_v_spin.setValue(0.2)
+        self.maintenance_wa1_limit_label = QLabel("限位窗口: -")
+        self.maintenance_wa1_status_label = QLabel("状态: 就绪")
+        self.btn_maintenance_wa1_single_joint_test = QPushButton("执行WA1单关节测试")
+        self.btn_maintenance_wa1_single_joint_test.clicked.connect(self.run_maintenance_wa1_single_joint_test)
+        self.btn_maintenance_wa1_single_joint_stop = QPushButton("停止测试")
+        self.btn_maintenance_wa1_single_joint_stop.setEnabled(False)
+        self.btn_maintenance_wa1_single_joint_stop.clicked.connect(self.stop_maintenance_wa1_single_joint_test)
+
+        wa1_row1 = QHBoxLayout()
+        wa1_row1.addWidget(QLabel("关节"))
+        wa1_row1.addWidget(self.maintenance_wa1_joint_combo, 1)
+        wa1_row1.addWidget(QLabel("增量rad"))
+        wa1_row1.addWidget(self.maintenance_wa1_amp_spin)
+        wa1_row1.addWidget(QLabel("发布Hz"))
+        wa1_row1.addWidget(self.maintenance_wa1_hz_spin)
+
+        wa1_row2 = QHBoxLayout()
+        wa1_row2.addWidget(QLabel("时长s"))
+        wa1_row2.addWidget(self.maintenance_wa1_duration_spin)
+        wa1_row2.addWidget(QLabel("误差阈值rad"))
+        wa1_row2.addWidget(self.maintenance_wa1_err_thresh_spin)
+        wa1_row2.addWidget(QLabel("回基线MoveJ v"))
+        wa1_row2.addWidget(self.maintenance_wa1_back_movej_v_spin)
+        wa1_row2.addWidget(self.btn_maintenance_wa1_single_joint_test)
+        wa1_row2.addWidget(self.btn_maintenance_wa1_single_joint_stop)
+        wa1_row2.addStretch(1)
+
+        self.maintenance_wa1_single_joint_box = QWidget()
+        wa1_box_layout = QVBoxLayout(self.maintenance_wa1_single_joint_box)
+        wa1_box_layout.setContentsMargins(0, 0, 0, 0)
+        wa1_box_layout.setSpacing(4)
+        wa1_box_layout.addWidget(QLabel("WA1运维单关节往复测试（默认10分钟，结束自动MoveJ回基线）"))
+        wa1_box_layout.addLayout(wa1_row1)
+        wa1_box_layout.addLayout(wa1_row2)
+        wa1_box_layout.addWidget(self.maintenance_wa1_limit_label)
+        wa1_box_layout.addWidget(self.maintenance_wa1_status_label)
+
+        upperlimb_layout.addWidget(self.maintenance_wa1_single_joint_box)
+        self._maintenance_refresh_wa1_joint_options()
+        self.maintenance_wa1_single_joint_box.setVisible(str(getattr(self, "robot_model", "WA2") or "WA2").upper() == "WA1")
+
         maintenance_bottom = QHBoxLayout()
         maintenance_bottom.addWidget(QLabel("测试结果"))
         maintenance_bottom.addStretch(1)
@@ -6219,8 +6296,495 @@ class MainWindow(QWidget):
             return
         self.run_factory_test_script("UpperLimb 激烈运动", "testcase/wa1/smoke/upperlimb_aggresive_move.py")
 
+    def _shared_joint_limits_config_path(self) -> str:
+        candidates = []
+        meipass = getattr(sys, "_MEIPASS", "")
+        if meipass:
+            candidates.append(os.path.join(meipass, "config", "joint_limits.yaml"))
+        runtime_dir = os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys, "frozen", False) else ""
+        if runtime_dir:
+            candidates.append(os.path.join(runtime_dir, "config", "joint_limits.yaml"))
+        candidates.append(os.path.join(self._get_storage_root(), "config", "joint_limits.yaml"))
+        for path in candidates:
+            if os.path.isfile(path):
+                return path
+        return candidates[0]
+
+    def _shared_joint_limits(self, model: str, force_reload: bool = False) -> dict[str, tuple[float, float]]:
+        model_tag = str(model or "").strip().upper()
+        if model_tag == "WA2":
+            model_tag = "WA2_LS"
+        if model_tag == "WA2_LS" and (not force_reload) and isinstance(self._maintenance_wa1_joint_limit_cache, dict) and self._maintenance_wa1_joint_limit_cache:
+            return dict(self._maintenance_wa1_joint_limit_cache)
+
+        cfg_path = self._shared_joint_limits_config_path()
+        if not os.path.isfile(cfg_path):
+            raise FileNotFoundError(f"未找到公共关节限位文件: {cfg_path}")
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+
+        src = data.get(model_tag) or {}
+        if not isinstance(src, dict) or not src:
+            raise RuntimeError(f"{model_tag}关节限位为空")
+
+        margin = float(self._maintenance_wa1_limit_margin)
+        mapped: dict[str, tuple[float, float]] = {}
+        for name, limits in src.items():
+            if not isinstance(limits, (list, tuple)) or len(limits) < 2:
+                continue
+            try:
+                low = float(limits[0]) + margin
+                high = float(limits[1]) - margin
+            except Exception:
+                continue
+            if high - low <= 1e-6:
+                continue
+            mapped[str(name)] = (low, high)
+
+        if not mapped:
+            raise RuntimeError(f"{model_tag}关节限位解析后为空(内缩后无有效区间)")
+        if model_tag == "WA1":
+            self._maintenance_wa1_joint_limit_cache = dict(mapped)
+        return mapped
+
+    def _maintenance_load_wa1_joint_limits(self, force_reload: bool = False) -> dict[str, tuple[float, float]]:
+        return self._shared_joint_limits("WA1", force_reload=force_reload)
+
+    def _maintenance_update_wa1_status_label(self):
+        if not hasattr(self, "maintenance_wa1_status_label"):
+            return
+        if self._maintenance_wa1_single_joint_running:
+            status_text = "状态: 停止中" if self._maintenance_wa1_single_joint_stop_requested else "状态: 运行中"
+        else:
+            status_text = "状态: 就绪"
+        self.maintenance_wa1_status_label.setText(status_text)
+        if hasattr(self, "btn_maintenance_wa1_single_joint_test"):
+            self.btn_maintenance_wa1_single_joint_test.setEnabled(not self._maintenance_wa1_single_joint_running)
+        if hasattr(self, "btn_maintenance_wa1_single_joint_stop"):
+            self.btn_maintenance_wa1_single_joint_stop.setEnabled(self._maintenance_wa1_single_joint_running)
+
+    def stop_maintenance_wa1_single_joint_test(self):
+        if not self._maintenance_wa1_single_joint_running:
+            self._emit_maintenance("[WARN] 当前没有在运行的WA1单关节测试")
+            return
+        self._maintenance_wa1_single_joint_stop_requested = True
+        self._emit_maintenance("[INFO] 已请求停止WA1单关节测试，正在收尾并回基线")
+        QTimer.singleShot(0, self._maintenance_update_wa1_status_label)
+
+        pid_text = str(self._maintenance_wa1_single_joint_remote_pid or "").strip()
+        if not pid_text.isdigit():
+            return
+        if not (self.ssh and self.ssh.ssh and self.ssh.sftp):
+            return
+
+        def killer():
+            try:
+                self._run_bash(self.ssh, f"kill -TERM {shlex.quote(pid_text)} >/dev/null 2>&1 || true")
+            except Exception:
+                pass
+
+        self._run_async(killer)
+
+    def _maintenance_refresh_wa1_joint_options(self):
+        if not hasattr(self, "maintenance_wa1_joint_combo"):
+            return
+        current = self.maintenance_wa1_joint_combo.currentText().strip()
+        self.maintenance_wa1_joint_combo.blockSignals(True)
+        self.maintenance_wa1_joint_combo.clear()
+        try:
+            limits = self._maintenance_load_wa1_joint_limits()
+        except Exception as e:
+            self.maintenance_wa1_joint_combo.addItem("<限位加载失败>")
+            if hasattr(self, "maintenance_wa1_limit_label"):
+                self.maintenance_wa1_limit_label.setText(f"限位窗口: 读取失败 ({e})")
+            self.maintenance_wa1_joint_combo.blockSignals(False)
+            return
+
+        preferred = [name for name in self._get_joint_names_by_model("WA1") if name in limits]
+        if not preferred:
+            preferred = sorted(limits.keys())
+        self.maintenance_wa1_joint_combo.addItems(preferred)
+        if current and current in preferred:
+            self.maintenance_wa1_joint_combo.setCurrentText(current)
+        self.maintenance_wa1_joint_combo.blockSignals(False)
+        self._maintenance_on_wa1_joint_changed()
+
+    def _maintenance_on_wa1_joint_changed(self, *_args):
+        if not hasattr(self, "maintenance_wa1_limit_label") or not hasattr(self, "maintenance_wa1_joint_combo"):
+            return
+        joint_name = self.maintenance_wa1_joint_combo.currentText().strip()
+        try:
+            limits = self._maintenance_load_wa1_joint_limits()
+            if joint_name in limits:
+                low, high = limits[joint_name]
+                margin = float(self._maintenance_wa1_limit_margin)
+                self.maintenance_wa1_limit_label.setText(f"限位窗口(内缩{margin:g}rad): [{low:.4f}, {high:.4f}]")
+            else:
+                self.maintenance_wa1_limit_label.setText("限位窗口: 当前关节无定义")
+        except Exception as e:
+            self.maintenance_wa1_limit_label.setText(f"限位窗口: 读取失败 ({e})")
+
+    def _maintenance_wa1_single_joint_remote_script(self, remote_payload_path: str) -> str:
+        return f'''import json\nimport os\nimport signal\nimport time\nimport rospy\nfrom sensor_msgs.msg import JointState\nfrom upperlimb.msg import Joints\nfrom upperlimb.srv import MoveJ, MoveJRequest, Servo, ServoRequest\n\nPAYLOAD_PATH = {remote_payload_path!r}\nSERVO_TOPIC = "/zj_humanoid/upperlimb/servoj/whole_body"\nCLEAR_SERVICE = "/zj_humanoid/upperlimb/clear_servo_params"\nSET_SERVICE = "/zj_humanoid/upperlimb/set_servo_params"\nJOINT_STATE_TOPIC = "/zj_humanoid/upperlimb/joint_states"\n\nwith open(PAYLOAD_PATH, "r", encoding="utf-8") as f:\n    cfg = json.load(f)\n\njoint_names = list(cfg.get("joint_names") or [])\nbaseline = [float(v) for v in (cfg.get("baseline") or [])]\nselected_joint = str(cfg.get("selected_joint") or "")\nduration_sec = float(cfg.get("duration_sec") or 600.0)\nhz = float(cfg.get("hz") or 200.0)\nstep_rad = abs(float(cfg.get("step_rad") or 0.0005))\nstart_value = float(cfg.get("start_value") or 0.0)\nerr_threshold = float(cfg.get("err_threshold") or 0.08)\nmovej_service = str(cfg.get("movej_service") or "")\nmovej_v = float(cfg.get("movej_v") or 0.2)\narm_type = int(cfg.get("arm_type") or 31)\nwindow_low = float(cfg.get("window_low"))\nwindow_high = float(cfg.get("window_high"))\n\nif not joint_names:\n    raise RuntimeError("joint_names为空")\nif len(baseline) != len(joint_names):\n    raise RuntimeError("baseline长度与joint_names不一致")\nif selected_joint not in joint_names:\n    raise RuntimeError(f"选中关节不存在: {{selected_joint}}")\nif not movej_service:\n    raise RuntimeError("movej_service为空")\nif window_high - window_low <= 1e-6:\n    raise RuntimeError("限位窗口无效")\nif step_rad <= 1e-6:\n    raise RuntimeError("step_rad无效")\n\nidx = joint_names.index(selected_joint)\nlatest_map = {{}}\nstop_requested = False\n\ndef js_cb(msg):\n    global latest_map\n    try:\n        latest_map = {{str(n): float(p) for n, p in zip(list(msg.name), list(msg.position))}}\n    except Exception:\n        pass\n\ndef stop_cb(_sig, _frame):\n    global stop_requested\n    stop_requested = True\n\nsignal.signal(signal.SIGINT, stop_cb)\nsignal.signal(signal.SIGTERM, stop_cb)\n\nrospy.init_node("wa1_single_joint_maintenance", anonymous=True, disable_signals=True)\nrospy.Subscriber(JOINT_STATE_TOPIC, JointState, js_cb, queue_size=1)\nrospy.wait_for_service(CLEAR_SERVICE, timeout=10.0)\nrospy.wait_for_service(SET_SERVICE, timeout=10.0)\nrospy.wait_for_service(movej_service, timeout=30.0)\nclear_srv = rospy.ServiceProxy(CLEAR_SERVICE, Servo)\nset_srv = rospy.ServiceProxy(SET_SERVICE, Servo)\nmovej_srv = rospy.ServiceProxy(movej_service, MoveJ)\npub = rospy.Publisher(SERVO_TOPIC, Joints, queue_size=1)\ntime.sleep(0.2)\nprint("__PID__:" + str(os.getpid()), flush=True)\n\ninterval = 1.0 / max(1.0, hz)\nclear_req = ServoRequest()\nclear_req.v = 0.0\nclear_req.acc = 0.0\nclear_req.time = 0.0\nclear_req.lookahead_time = 0.0\nclear_req.gain = 0\nclear_req.arm_type = arm_type\nclear_srv(clear_req)\nset_req = ServoRequest()\nset_req.v = 0.1\nset_req.acc = 0.5\nset_req.time = interval\nset_req.lookahead_time = 0.2\nset_req.gain = 100\nset_req.arm_type = arm_type\nset_srv(set_req)\n\nstart_ts = time.monotonic()\nnext_tick = start_ts\nnext_probe = start_ts\nprobe_interval = 0.2\npeak_err = 0.0\npublished = 0\n\ntarget = min(window_high, max(window_low, start_value))\ndirection = 1\n\nwhile (not stop_requested) and (not rospy.is_shutdown()):\n    now = time.monotonic()\n    elapsed = now - start_ts\n    if elapsed >= duration_sec:\n        break\n\n    cmd = list(baseline)\n    cmd[idx] = float(target)\n    msg = Joints()\n    msg.joint = [float(v) for v in cmd]\n    pub.publish(msg)\n    published += 1\n\n    if now >= next_probe:\n        actual = latest_map.get(selected_joint)\n        if actual is not None:\n            peak_err = max(peak_err, abs(float(actual) - float(target)))\n        next_probe += probe_interval\n\n    next_target = float(target) + float(direction) * float(step_rad)\n    if next_target >= window_high:\n        next_target = window_high\n        direction = -1\n    elif next_target <= window_low:\n        next_target = window_low\n        direction = 1\n    target = next_target\n\n    next_tick += interval\n    while True:\n        remain = next_tick - time.monotonic()\n        if remain <= 0:\n            break\n        time.sleep(min(0.001, remain))\n\nactual_duration = time.monotonic() - start_ts\n\nmovej_req = MoveJRequest()\nmovej_req.joints = [float(v) for v in baseline]\nmovej_req.v = movej_v\nmovej_req.acc = 1.0\nmovej_req.t = 5.0\nmovej_req.is_async = False\nmovej_req.arm_type = arm_type\nmovej_srv(movej_req)\ntime.sleep(1.0)\n\nactual_after = latest_map.get(selected_joint)\nbaseline_val = float(baseline[idx])\nreturn_err = abs(float(actual_after) - baseline_val) if actual_after is not None else None\n\nresult = {{\n    "mode": "ssh",\n    "selected_joint": selected_joint,\n    "peak_error": float(peak_err),\n    "return_error": None if return_err is None else float(return_err),\n    "duration_target": float(duration_sec),\n    "duration_actual": float(actual_duration),\n    "duration_ok": bool(actual_duration >= duration_sec * 0.98),\n    "return_ok": bool(return_err is not None and return_err <= err_threshold),\n    "published": int(published),\n    "error_threshold": float(err_threshold),\n    "aborted": bool(stop_requested),\n}}\nresult["pass"] = bool((not result["aborted"]) and result["duration_ok"] and result["return_ok"])\nprint("__RESULT__:" + json.dumps(result, ensure_ascii=False), flush=True)\n'''
+
+    def _maintenance_run_wa1_single_joint_ros(
+        self,
+        joint_names: list[str],
+        baseline: list[float],
+        selected_joint: str,
+        window_low: float,
+        window_high: float,
+        duration_sec: float,
+        hz: float,
+        step_rad: float,
+        start_value: float,
+        movej_v: float,
+        err_threshold: float,
+    ) -> dict:
+        arm_type = 31
+        movej_service = self._movej_single_service_for_arm_type(arm_type)
+        if not movej_service:
+            raise RuntimeError("无法解析WA1 whole_body MoveJ服务")
+        if not (self.ros and self.ros.check_connection()):
+            raise RuntimeError("ROSBridge 不可用")
+
+        clear_req = {"v": 0.0, "acc": 0.0, "time": 0.0, "lookahead_time": 0.0, "gain": 0, "arm_type": arm_type}
+        set_req = {"v": 0.1, "acc": 0.5, "time": 1.0 / max(1.0, hz), "lookahead_time": 0.2, "gain": 100, "arm_type": arm_type}
+        self.ros.request_service("/zj_humanoid/upperlimb/clear_servo_params", clear_req, service_type="upperlimb/Servo", timeout=10.0)
+        self.ros.request_service("/zj_humanoid/upperlimb/set_servo_params", set_req, service_type="upperlimb/Servo", timeout=10.0)
+
+        topic = roslibpy.Topic(self.ros.ros, "/zj_humanoid/upperlimb/servoj/whole_body", "upperlimb/Joints")
+        idx = joint_names.index(selected_joint)
+        interval = 1.0 / max(1.0, hz)
+        start_ts = time.monotonic()
+        next_tick = start_ts
+        next_probe = start_ts
+        peak_err = 0.0
+        published = 0
+        target = min(float(window_high), max(float(window_low), float(start_value)))
+        direction = 1
+        try:
+            topic.advertise()
+            while True:
+                if self._maintenance_wa1_single_joint_stop_requested:
+                    break
+                now = time.monotonic()
+                elapsed = now - start_ts
+                if elapsed >= duration_sec:
+                    break
+                if not self.ros.check_connection():
+                    raise RuntimeError("执行中ROSBridge断开")
+                cmd = list(baseline)
+                cmd[idx] = float(target)
+                topic.publish(roslibpy.Message({"joint": [float(v) for v in cmd]}))
+                published += 1
+
+                if now >= next_probe:
+                    state_map = self._fetch_joint_state_once() or {}
+                    actual = state_map.get(selected_joint)
+                    if actual is not None:
+                        peak_err = max(peak_err, abs(float(actual) - float(target)))
+                    next_probe += 0.2
+
+                next_target = float(target) + float(direction) * float(step_rad)
+                if next_target >= float(window_high):
+                    next_target = float(window_high)
+                    direction = -1
+                elif next_target <= float(window_low):
+                    next_target = float(window_low)
+                    direction = 1
+                target = next_target
+
+                next_tick += interval
+                while True:
+                    remain = next_tick - time.monotonic()
+                    if remain <= 0:
+                        break
+                    time.sleep(min(0.001, remain))
+        finally:
+            try:
+                topic.unadvertise()
+            except Exception:
+                pass
+
+        duration_actual = time.monotonic() - start_ts
+        movej_req = {
+            "joints": [float(v) for v in baseline],
+            "v": float(movej_v),
+            "acc": 1.0,
+            "t": 5.0,
+            "is_async": False,
+            "arm_type": arm_type,
+        }
+        self.ros.request_service(movej_service, movej_req, service_type="upperlimb/MoveJ", timeout=30.0)
+        time.sleep(1.0)
+        state_after = self._fetch_joint_state_once() or {}
+        return_err = None
+        if selected_joint in state_after:
+            return_err = abs(float(state_after[selected_joint]) - float(baseline[idx]))
+
+        return {
+            "mode": "rosbridge",
+            "selected_joint": selected_joint,
+            "peak_error": float(peak_err),
+            "return_error": None if return_err is None else float(return_err),
+            "duration_target": float(duration_sec),
+            "duration_actual": float(duration_actual),
+            "duration_ok": bool(duration_actual >= duration_sec * 0.98),
+            "return_ok": bool(return_err is not None and return_err <= err_threshold),
+            "published": int(published),
+            "error_threshold": float(err_threshold),
+            "aborted": bool(self._maintenance_wa1_single_joint_stop_requested),
+        }
+
+    def _maintenance_run_wa1_single_joint_ssh(
+        self,
+        joint_names: list[str],
+        baseline: list[float],
+        selected_joint: str,
+        window_low: float,
+        window_high: float,
+        duration_sec: float,
+        hz: float,
+        step_rad: float,
+        start_value: float,
+        movej_v: float,
+        err_threshold: float,
+    ) -> dict:
+        if not self._ensure_ssh():
+            raise RuntimeError("SSH(小脑)未连接")
+
+        remote_dir = "/tmp/maintenance_wa1_single_joint"
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        remote_payload_path = f"{remote_dir}/payload_{stamp}.json"
+        remote_script_path = f"{remote_dir}/runner_{stamp}.py"
+        fd_payload, local_payload_path = tempfile.mkstemp(prefix="wa1_single_joint_", suffix=".json")
+        os.close(fd_payload)
+        fd_script, local_script_path = tempfile.mkstemp(prefix="wa1_single_joint_", suffix=".py")
+        os.close(fd_script)
+        try:
+            payload = {
+                "joint_names": list(joint_names),
+                "baseline": [float(v) for v in baseline],
+                "selected_joint": str(selected_joint),
+                "duration_sec": float(duration_sec),
+                "hz": float(hz),
+                "step_rad": float(step_rad),
+                "start_value": float(start_value),
+                "err_threshold": float(err_threshold),
+                "window_low": float(window_low),
+                "window_high": float(window_high),
+                "arm_type": 31,
+                "movej_service": self._movej_single_service_for_arm_type(31),
+                "movej_v": float(movej_v),
+            }
+            with open(local_payload_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False)
+            with open(local_script_path, "w", encoding="utf-8") as f:
+                f.write(self._maintenance_wa1_single_joint_remote_script(remote_payload_path))
+
+            self._run_bash(self.ssh, f"mkdir -p {shlex.quote(remote_dir)}")
+            self.ssh.upload(local_payload_path, remote_payload_path)
+            self.ssh.upload(local_script_path, remote_script_path)
+
+            cmd = (
+                f"chmod +x {shlex.quote(remote_script_path)}; "
+                f"source ~/.bashrc >/dev/null 2>&1; "
+                f"source /opt/ros/noetic/setup.bash >/dev/null 2>&1; "
+                f"python3 {shlex.quote(remote_script_path)}"
+            )
+            self._maintenance_wa1_single_joint_remote_pid = ""
+
+            def on_output(line: str):
+                text = str(line or "")
+                for one in text.splitlines():
+                    s = str(one or "").strip()
+                    if s.startswith("__PID__:"):
+                        self._maintenance_wa1_single_joint_remote_pid = s.split(":", 1)[1].strip()
+                        self._emit_maintenance(f"[INFO] SSH远端执行PID: {self._maintenance_wa1_single_joint_remote_pid}")
+                    elif s:
+                        self._emit_maintenance(s)
+
+            out, err, exit_code = self._run_interactive_bash_with_exit_code(self.ssh, cmd, on_output=on_output)
+            if exit_code != 0:
+                if self._maintenance_wa1_single_joint_stop_requested:
+                    return {
+                        "mode": "ssh",
+                        "selected_joint": selected_joint,
+                        "peak_error": 0.0,
+                        "return_error": None,
+                        "duration_target": float(duration_sec),
+                        "duration_actual": 0.0,
+                        "duration_ok": False,
+                        "return_ok": False,
+                        "published": 0,
+                        "error_threshold": float(err_threshold),
+                        "aborted": True,
+                    }
+                raise RuntimeError(((out or "") + "\n" + (err or "")).strip() or f"exit_code={exit_code}")
+
+            merged = "\n".join([out or "", err or ""]).splitlines()
+            result_line = ""
+            for line in merged:
+                if line.startswith("__RESULT__:"):
+                    result_line = line.split("__RESULT__:", 1)[1].strip()
+            if not result_line:
+                raise RuntimeError("远端未返回测试结果")
+            return json.loads(result_line)
+        finally:
+            self._maintenance_wa1_single_joint_remote_pid = ""
+            try:
+                os.remove(local_payload_path)
+            except Exception:
+                pass
+            try:
+                os.remove(local_script_path)
+            except Exception:
+                pass
+            try:
+                self._run_bash(self.ssh, f"rm -f {shlex.quote(remote_payload_path)} {shlex.quote(remote_script_path)}")
+            except Exception:
+                pass
+
+    def run_maintenance_wa1_single_joint_test(self):
+        if self._maintenance_wa1_single_joint_running:
+            self._emit_maintenance("[WARN] WA1单关节测试正在运行")
+            return
+        if str(getattr(self, "robot_model", "WA2") or "WA2").upper() != "WA1":
+            self._emit_maintenance("[ERR] 当前型号不是WA1，无法执行单关节测试")
+            return
+
+        joint_name = self.maintenance_wa1_joint_combo.currentText().strip() if hasattr(self, "maintenance_wa1_joint_combo") else ""
+        duration_sec = float(self.maintenance_wa1_duration_spin.value()) if hasattr(self, "maintenance_wa1_duration_spin") else 600.0
+        hz = float(self.maintenance_wa1_hz_spin.value()) if hasattr(self, "maintenance_wa1_hz_spin") else 200.0
+        movej_v = float(self.maintenance_wa1_back_movej_v_spin.value()) if hasattr(self, "maintenance_wa1_back_movej_v_spin") else 0.2
+        step_rad = float(self.maintenance_wa1_amp_spin.value()) if hasattr(self, "maintenance_wa1_amp_spin") else 0.0005
+        err_threshold = float(self.maintenance_wa1_err_thresh_spin.value()) if hasattr(self, "maintenance_wa1_err_thresh_spin") else 0.08
+        if not joint_name:
+            self._emit_maintenance("[ERR] 请选择测试关节")
+            return
+
+        try:
+            limits = self._maintenance_load_wa1_joint_limits()
+            if joint_name not in limits:
+                raise RuntimeError(f"关节{joint_name}没有WA1限位定义")
+            low, high = limits[joint_name]
+        except Exception as e:
+            self._emit_maintenance(f"[ERR] WA1限位读取失败: {e}")
+            return
+
+        state_map = self._fetch_joint_state_once() or {}
+        joint_names = list(self._get_joint_names_by_model("WA1"))
+        if joint_name not in joint_names:
+            self._emit_maintenance(f"[ERR] WA1关节列表中不存在 {joint_name}")
+            return
+        if not isinstance(state_map, dict) or not state_map:
+            self._emit_maintenance("[ERR] 未读取到有效关节状态，已取消测试")
+            return
+        missing = [name for name in joint_names if name not in state_map]
+        if missing:
+            preview = ", ".join(missing[:6])
+            suffix = "..." if len(missing) > 6 else ""
+            self._emit_maintenance(
+                f"[ERR] 关节状态不完整(缺失{len(missing)}个)，已取消测试: {preview}{suffix}"
+            )
+            return
+        baseline = [float(state_map[name]) for name in joint_names]
+        idx = joint_names.index(joint_name)
+        base_value = baseline[idx]
+        window_low = float(low)
+        window_high = float(high)
+        start_value = min(window_high, max(window_low, base_value))
+        if window_high - window_low <= 1e-6:
+            self._emit_maintenance(
+                f"[ERR] 可执行窗口过小: baseline={base_value:.4f}, limit=[{low:.4f},{high:.4f}]"
+            )
+            return
+        if step_rad <= 1e-6:
+            self._emit_maintenance("[ERR] 步长必须大于0")
+            return
+        if abs(start_value - base_value) > 1e-6:
+            self._emit_maintenance(f"[WARN] 当前值{base_value:.4f}超出限位窗口，起点已夹紧为{start_value:.4f}")
+
+        ros_ok = bool(self.ros and self.ros.check_connection())
+        if (not ros_ok) and (not self._ensure_ssh()):
+            self._emit_maintenance("[ERR] ROSBridge和SSH均不可用，无法执行测试")
+            return
+        mode = "rosbridge" if ros_ok else "ssh"
+
+        self._maintenance_wa1_single_joint_running = True
+        self._maintenance_wa1_single_joint_stop_requested = False
+        self._maintenance_wa1_single_joint_remote_pid = ""
+        self._maintenance_update_wa1_status_label()
+        self._emit_maintenance(
+            f"[INFO] WA1单关节测试开始: joint={joint_name}, mode={mode}, duration={duration_sec:.1f}s, hz={hz:.0f}, step={step_rad:.3f}rad, start={start_value:.4f}, sweep=[{window_low:.4f},{window_high:.4f}]"
+        )
+
+        def worker():
+            try:
+                if mode == "rosbridge":
+                    result = self._maintenance_run_wa1_single_joint_ros(
+                        joint_names,
+                        baseline,
+                        joint_name,
+                        window_low,
+                        window_high,
+                        duration_sec,
+                        hz,
+                        step_rad,
+                        start_value,
+                        movej_v,
+                        err_threshold,
+                    )
+                else:
+                    result = self._maintenance_run_wa1_single_joint_ssh(
+                        joint_names,
+                        baseline,
+                        joint_name,
+                        window_low,
+                        window_high,
+                        duration_sec,
+                        hz,
+                        step_rad,
+                        start_value,
+                        movej_v,
+                        err_threshold,
+                    )
+
+                result["pass"] = bool((not result.get("aborted")) and result.get("duration_ok") and result.get("return_ok"))
+                peak_err = result.get("peak_error")
+                return_err = result.get("return_error")
+                self._emit_maintenance(
+                    "[INFO] 结果摘要: "
+                    f"duration={float(result.get('duration_actual', 0.0)):.2f}/{float(result.get('duration_target', duration_sec)):.2f}s, "
+                    f"peak_err={float(peak_err or 0.0):.4f}, "
+                    f"return_err={(f'{float(return_err):.4f}' if return_err is not None else 'N/A')}"
+                )
+                if result["pass"]:
+                    self._emit_maintenance("[OK] WA1单关节测试PASS")
+                else:
+                    fail_reasons = []
+                    if result.get("aborted"):
+                        fail_reasons.append("人工停止")
+                    if not result.get("duration_ok"):
+                        fail_reasons.append("运行时长不足")
+                    if not result.get("return_ok"):
+                        fail_reasons.append("回基线误差超阈值")
+                    self._emit_maintenance(f"[FAIL] WA1单关节测试未通过: {'; '.join(fail_reasons) if fail_reasons else '未知原因'}")
+            except Exception as e:
+                self._emit_maintenance(f"[ERR] WA1单关节测试执行失败: {e}")
+            finally:
+                self._maintenance_wa1_single_joint_running = False
+                self._maintenance_wa1_single_joint_remote_pid = ""
+                QTimer.singleShot(0, self._maintenance_update_wa1_status_label)
+
+        self._run_async(worker)
+
     def run_maintenance_upperlimb_test(self):
         model = str(getattr(self, "robot_model", "WA2") or "WA2").upper()
+        if model == "WA1":
+            self.run_maintenance_wa1_single_joint_test()
+            return
         run_count = int(self.maintenance_upperlimb_loop_spin.value()) if hasattr(self, "maintenance_upperlimb_loop_spin") else 1
         if model == "WA2_LS":
             if not self._ensure_ssh():
