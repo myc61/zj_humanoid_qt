@@ -1,0 +1,259 @@
+URDF_FILE: /opt/ros/noetic/share/pico_runtime/uplimb/models/WA1_D11.urdf
+
+ROBOT_NAME: WA1_D11
+
+JOINTS_LIST:
+  - Shoulder_Y_L:
+      pos_limit: [-3, 1]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 0
+      home: -0.25
+      driverNum: 0
+      algNum: 0
+      f_a: 2.44
+      f_b: 1.20
+      f_c: 1.20
+  - Shoulder_X_L:
+      pos_limit: [-0.0035, 3.0892]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 0
+      home: 0.75
+      driverNum: 1
+      algNum: 1
+      f_a: 1.35
+      f_b: 1.83
+      f_c: -0.52
+  - Shoulder_Z_L:
+      pos_limit: [-2.8885, 2.8885]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 0
+      home: 0.38
+      driverNum: 2
+      algNum: 2
+      f_a: 1.46
+      f_b: 1.70
+      f_c: 0.02
+  - Elbow_L:
+      pos_limit: [-2.0420, 0.0820]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 1
+      home: -1.15
+      driverNum: 3
+      algNum: 3
+      f_a: 1.66
+      f_b: 0.59
+      f_c: 0.78
+  - Wrist_Z_L:
+      pos_limit: [-2.9147, 2.9147]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 0
+      home: 0.1
+      driverNum: 4
+      algNum: 4
+      f_a: 0.49
+      f_b: 0.61
+      f_c: 0.00
+  - Wrist_Y_L:
+      pos_limit: [-1.5184, 1.2566]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 1
+      home: -0.12
+      driverNum: 5
+      algNum: 5
+      f_a: 0.67
+      f_b: 0.06
+      f_c: 0.10
+  - Wrist_X_L:
+      pos_limit: [-1.5184, 1.5184]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 1
+      home: 0.1
+      driverNum: 6
+      algNum: 6
+      f_a: 0.52
+      f_b: 0.37
+      f_c: -0.19
+  - Shoulder_Y_R:
+      pos_limit: [-3.2638, 1.1694]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 0
+      home: -0.25
+      driverNum: 7
+      algNum: 7
+      f_a: 2.72
+      f_b: 1.64
+      f_c: 1.11
+  - Shoulder_X_R:
+      pos_limit: [-3.0892, 0.0035]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 0
+      home: -0.75
+      driverNum: 8
+      algNum: 8
+      f_a: 2.90
+      f_b: 1.00
+      f_c: 1.14
+  - Shoulder_Z_R:
+      pos_limit: [-2.8885, 2.8885]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 0
+      home: -0.38
+      driverNum: 9
+      algNum: 9
+      f_a: 1.33
+      f_b: 1.49
+      f_c: 0.00
+  - Elbow_R:
+      pos_limit: [-2.0420, 0.0820]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 1
+      home: -1.15
+      driverNum: 10
+      algNum: 10
+      f_a: 2.44
+      f_b: 0.69
+      f_c: 0.79
+  - Wrist_Z_R:
+      pos_limit: [-2.9147, 2.9147]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 0
+      home: -0.1
+      driverNum: 11
+      algNum: 11
+      f_a: 0.56
+      f_b: 0.88
+      f_c: 0.00
+  - Wrist_Y_R:
+      pos_limit: [-1.5184, 1.2566]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 1
+      home: -0.12
+      driverNum: 12
+      algNum: 12
+      f_a: 0.63
+      f_b: 0.38
+      f_c: -0.11
+  - Wrist_X_R:
+      pos_limit: [-1.5184, 1.5184]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 1
+      home: -0.1
+      driverNum: 13
+      algNum: 13
+      f_a: 0.51
+      f_b: 0.62
+      f_c: -0.06
+  - Neck_Z:
+      pos_limit: [-0.7330, 0.7330]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 1
+      home: 0.0
+      driverNum: 14
+      algNum: 14
+      f_a: 0.00
+      f_b: 0.00
+      f_c: 0.00
+  - Neck_Y:
+      pos_limit: [-0.1693, 0.3438]
+      vel_limit: 5.0
+      acc_limit: 100.0
+      offset_vel: 1
+      home: 0.0
+      driverNum: 15
+      algNum: 15
+      f_a: 0.00
+      f_b: 0.00
+      f_c: 0.00
+  - Lifting_Z:
+      pos_limit: [0.000, 0.235]
+      vel_limit: 0.5
+      acc_limit: 10
+      offset_vel: 1
+      home: 0.01
+      driverNum: 16
+      algNum: 16
+      f_a: 0.00
+      f_b: 0.00
+      f_c: 0.00
+  - Waist_Z:
+      pos_limit: [-2.0420, 3.1765]
+      vel_limit: 2.5
+      acc_limit: 30.0
+      offset_vel: 0
+      home: 0.0
+      driverNum: 17
+      algNum: 17
+      f_a: 0.00
+      f_b: 0.00
+      f_c: 0.00
+  - Waist_Y:
+      pos_limit: [-0.5184, 0.7330]
+      vel_limit: 2.5
+      acc_limit: 30.0
+      offset_vel: 0
+      home: 0.0
+      driverNum: 18
+      algNum: 18
+      f_a: 0.00
+      f_b: 0.00
+      f_c: 0.00     
+
+ROBOT_DEFINITION:
+  - name: "LEFT_ARM" 
+    arm_type: 1
+    jnt_chain: [0, 1, 2, 3, 4, 5, 6]
+    cart_chain: [1, 1, 1, 1, 1, 1, 1]
+    ee_name: "TCP_L"
+    parent: 16
+    child: [0]
+  - name: "RIGHT_ARM"
+    arm_type: 2
+    jnt_chain: [7, 8, 9, 10, 11, 12, 13]
+    cart_chain: [1, 1, 1, 1, 1, 1, 1]
+    ee_name: "TCP_R"
+    parent: 16
+    child: [0]
+  - name: "NECK"
+    arm_type: 4
+    jnt_chain: [14, 15] 
+    cart_chain: [1, 1]
+    ee_name: "HEAD"
+    parent: 16
+    child: [0]
+  - name: "WAIST_LIFT"
+    arm_type: 8
+    jnt_chain: [16]
+    cart_chain: [1]
+    ee_name: "BODY"
+    parent: 0
+    child: [16]
+  - name: "WAIST"
+    arm_type: 16
+    jnt_chain: [17, 18]
+    cart_chain: [1, 1]
+    ee_name: "WAIST_PITCH"
+    parent: 8
+    child: [1, 2, 4]
+
+F_S_K: 0.005
+
+CART_KP: 500
+
+COLLISION_DETECTION_ON: true
+
+CONTROLLER_PARA_PATH: /opt/ros/noetic/share/pico_runtime/uplimb/config/controller_paras_wa1.yaml
